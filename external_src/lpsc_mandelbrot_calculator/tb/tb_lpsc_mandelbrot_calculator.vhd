@@ -123,6 +123,8 @@ begin
         -- On attend la fin du reset.
         wait until (RstxR = '0');
 	StartxS <= '1';
+	wait until rising_edge(ClkxC);
+	StartxS <= '0';
 
         -- On effectue C_NB_TEST fois le test.
         for i in 0 to 30 loop

@@ -120,52 +120,65 @@ begin
 	z_real <= ZnRxDN;
 	z_imaginary <= ZnIxDN;
 
-	process(clk)
-    	begin 
+	--process(clk)
+    	--begin 
 	-- a revoir
-		if (rst = '1') then
-			ZnIxDP <= (others => '0');
-			ZnRxDP <= (others => '0');
-			IterationNumxDP <= (others => '0');
-		elsif(rising_edge(clk)) then 
-			ZnIxDP <= ZnIxDN;
-			ZnRxDP <= ZnRxDN;
-			IterationNumxDP <= IterationNumxDN;
-			if (unsigned(RvaluexD(17 downto 14)) > 4) then 
-				CalcDonexS <= '1';
-			elsif (unsigned(RvaluexD(17 downto 14)) = 4) then -- and (unsigned(RvaluexD(13 downto 0) /= 0)))then 
-				CalcDonexS <= '1';
-			else 
-				CalcDonexS <= '0';
-			end if;
-		end if;
-    	end process;
+		--if (rst = '1') then
+			-- ZnIxDP <= (others => '0');
+			-- ZnRxDP <= (others => '0');
+		--	IterationNumxDP <= (others => '0');
+		--elsif(rising_edge(clk)) then 
+			--ZnIxDP <= ZnIxDN;
+			--ZnRxDP <= ZnRxDN;
+			--IterationNumxDP <= IterationNumxDN;
+			--if (unsigned(RvaluexD(17 downto 14)) > 4) then 
+			--	CalcDonexS <= '1';
+			--elsif (unsigned(RvaluexD(17 downto 14)) = 4) then -- and (unsigned(RvaluexD(13 downto 0) /= 0)))then 
+			--	CalcDonexS <= '1';
+			--else 
+		--		CalcDonexS <= '0';
+		--	end if;
+	--	end if;
+    --	end process;
 	
 	state_machine : process(clk,rst)
 	begin 
 		FinishedxS <= '0';
 		if(rst = '1') then
+			ZnIxDP <= (others => '0');
+			ZnRxDP <= (others => '0');
+			--ZnIxDN <= (others => '0');
+			--ZnRxDN <= (others => '0');
+			IterationNumxDP <= (others => '0');
+			--IterationNumxDN <= (others => '0');
 			StatexP <= rdy;
 		elsif(rising_edge(clk)) then
 			case StatexP is 
 				when rdy =>
 					if StartxS = '1' then
-						IterationxD <= (others => '0');
+						--IterationxD <= (others => '0');
 						StatexP <= calc;
 					else
 						StatexP <= rdy;
+						ZnIxDP <= (others => '0');
+						ZnRxDP <= (others => '0');
+						--ZnIxDN <= (others => '0');
+						--ZnRxDN <= (others => '0');
+						IterationNumxDP <= (others => '0');
+						--IterationNumxDN <= (others => '0');
 					end if;
 				when calc =>
-					if CalcDonexS = '1' then
+					ZnIxDP <= ZnIxDN;
+					ZnRxDP <= ZnRxDN;
+					IterationNumxDP <= IterationNumxDN;
+					if (unsigned(RvaluexD(17 downto 14)) > 4) or ((unsigned(RvaluexD(17 downto 14)) = 4) and (unsigned(RvaluexD(13 downto 0)) /= 0)) then
 						StatexP <= finish;
 					else
-						IterationxD <= std_logic_vector(unsigned(IterationxD) + 1);
 						StatexP <= calc;
 					end if;
 				when finish =>
 					FinishedxS <= '1';
 					StatexP <= rdy;
-			--StatexP <= StatexN;
 			end case;
 		end if;
 	end process state_machine;
