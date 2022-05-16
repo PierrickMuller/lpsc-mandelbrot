@@ -17,6 +17,7 @@ def complex_to_binary(c,n):
     frac_real, whole_real = math.modf(c.real)
     frac_imag, whole_imag = math.modf(c.imag)
     bin_whole_real = '{:04b}'.format(int(whole_real))
+    print(bin_whole_real)
     bin_whole_imag = '{:04b}'.format(int(whole_imag))
 
     print("Iteration number : " + str(n))
@@ -60,8 +61,10 @@ RE_END = 1
 IM_START = -1
 IM_END = 1
 
-c = complex(0.5,1)
+c = complex(-2,1)
 print(" C0 : " + str(c)) 
+
+complex_to_binary(c,0)
 
 # Compute the number of iterations
 m = mandelbrot(c)

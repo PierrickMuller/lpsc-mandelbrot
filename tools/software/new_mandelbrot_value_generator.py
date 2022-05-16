@@ -102,6 +102,7 @@ for x in range(0, WIDTH):
         draw.point([x, y], (color, color, color))
 
 c = complex(-2,1)
-complex_to_binary(c,0);
+z,m = mandelbrot(c)
+#complex_to_binary(c,0);
 
 im.save('output.png', 'PNG')

@@ -15,7 +15,9 @@ def frac_to_binary(f):
 
 def complex_to_binary(c,n):
     frac_real, whole_real = math.modf(c.real)
+    frac_real = round(frac_real,9)
     frac_imag, whole_imag = math.modf(c.imag)
+    frac_imag = round(frac_imag,9)
     bin_whole_real = '{:04b}'.format(int(whole_real))
     bin_whole_imag = '{:04b}'.format(int(whole_imag))
 
@@ -65,7 +67,7 @@ RE_END = 1
 IM_START = -1
 IM_END = 1
 
-c = complex(0.5,0.5)
+c = complex(-1.96625,0.09333333333333327)
 print(" C0 : " + str(c)) 
 
 # Compute the number of iterations

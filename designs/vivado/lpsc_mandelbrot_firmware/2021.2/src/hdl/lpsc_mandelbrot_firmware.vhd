@@ -24,6 +24,13 @@
 -- Description : Uncomment BRAM and different clock domain
 --
 ---------------------------------------------------------------------------------
+--
+-- Modification : 14.05.2022
+-- Author : Pierrick Muller
+-- Description : start integration iterator
+--
+---------------------------------------------------------------------------------
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -87,9 +94,11 @@ architecture arch of lpsc_mandelbrot_firmware is
     -- constant C_RESOLUTION : string := "1024x768";
     -- constant C_RESOLUTION : string := "1024x600";
     constant C_RESOLUTION : string := "800x600";
+    constant C_INC_RE	  : std_logic_vector(17 downto 0) := "000000000000111101";
+    constant C_INC_IM	  : std_logic_vector(17 downto 0) := "000000000000110111";
     -- constant C_RESOLUTION : string := "640x480";
 
-    constant C_DATA_SIZE                        : integer               := 16;
+    constant C_DATA_SIZE                        : integer               := 18; --16
     constant C_PIXEL_SIZE                       : integer               := 8;
     constant C_BRAM_VIDEO_MEMORY_ADDR_SIZE      : integer               := 20;
     constant C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE : integer               := 10;
@@ -174,6 +183,43 @@ architecture arch of lpsc_mandelbrot_firmware is
             doutb : out std_logic_vector(8 downto 0));
     end component;
 
+    COMPONENT lpsc_mandelbrot_calculator_0
+	  PORT (
+    		clk : IN STD_LOGIC;
+    		rst : IN STD_LOGIC;
+    		ready : OUT STD_LOGIC;
+    		start : IN STD_LOGIC;
+    		finished : OUT STD_LOGIC;
+    		c_real : IN STD_LOGIC_VECTOR(17 DOWNTO 0);
+    		c_imaginary : IN STD_LOGIC_VECTOR(17 DOWNTO 0);
+    		z_real : OUT STD_LOGIC_VECTOR(17 DOWNTO 0);
+    		z_imaginary : OUT STD_LOGIC_VECTOR(17 DOWNTO 0);
+    		iterations : OUT STD_LOGIC_VECTOR(17 DOWNTO 0));
+    END COMPONENT;
+
+    	component lpsc_mandelbrot_ComplexValueGenerator is
+		generic(
+			SIZE       : integer := 18;  -- Taille en bits de nombre au format virgule fixe
+			X_SIZE     : integer := 800;  -- Taille en X (Nombre de pixel) de la fractale à afficher
+			Y_SIZE     : integer := 600;  -- Taille en Y (Nombre de pixel) de la fractale à afficher
+			SCREEN_RES : integer := 10);  -- Nombre de bit pour les vecteurs X et Y de la position du pixel
+
+    		port(
+			clk           : in  std_logic;
+			reset         : in  std_logic;
+			-- interface avec le module MandelbrotMiddleware
+			next_value    : in  std_logic;
+			c_inc_RE      : in  std_logic_vector((SIZE - 1) downto 0);
+			c_inc_IM      : in  std_logic_vector((SIZE - 1) downto 0);
+			c_top_left_RE : in  std_logic_vector((SIZE - 1) downto 0);
+			c_top_left_IM : in  std_logic_vector((SIZE - 1) downto 0);
+			c_real        : out std_logic_vector((SIZE - 1) downto 0);
+			c_imaginary   : out std_logic_vector((SIZE - 1) downto 0);
+			X_screen      : out std_logic_vector((SCREEN_RES - 1) downto 0);
+			Y_screen      : out std_logic_vector((SCREEN_RES - 1) downto 0));
+	end component lpsc_mandelbrot_ComplexValueGenerator;
+
+
     -- Signals
 
     -- Clocks
@@ -215,6 +261,33 @@ architecture arch of lpsc_mandelbrot_firmware is
     signal RdEmptyFlagColor1xS  : std_logic                                         := '0';
     signal RdDataFlagColor1xDP  : std_logic_vector((C_FIFO_DATA_SIZE - 1) downto 0) := x"003a8923";
     signal RdDataFlagColor1xDN  : std_logic_vector((C_FIFO_DATA_SIZE - 1) downto 0) := x"003a8923";
+
+    -- Tests signals Calculator
+    signal ReadyxS		: std_logic					    := '0';
+    signal StartxS		: std_logic					    := '0';
+    signal FinishedxS		: std_logic					    := '0';
+    signal CrealxD		: std_logic_vector(17 downto 0)			    := (others => '0');
+    signal CimaginaryxD		: std_logic_vector(17 downto 0)			    := (others => '0');
+    signal ZrealxD		: std_logic_vector(17 downto 0)			    := (others => '0');
+    signal ZimaginaryxD		: std_logic_vector(17 downto 0)			    := (others => '0');
+    signal IterationsxD		: std_logic_vector(17 downto 0)			    := (others => '0');
+   
+    -- Signaux machine d'état 
+    type States is (idle,iter,write_mem);
+    signal StatexP,StatexN : States := idle;
+
+    -- Tests signaux generator
+    signal NextValuexS		: std_logic := '0';
+    signal CincrexD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := (others => '0');
+    signal CincimxD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := (others => '0');
+    signal CtopleftrexD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := "111000000000000000";
+    signal CtopleftimxD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := "000100000000000000";
+    --signal CrealxD		: std_logic_vector((SIZE -1) downto 0) := (others => '0');
+    --signal CimaginaryxD		: std_logic_vector((SIZE -1) downto 0) := (others => '0');
+    signal XscreenxD		: std_logic_vector((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE -1) downto 0) := (others => '0');
+    signal YscreenxD		: std_logic_vector((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE -1) downto 0) := (others => '0');
+
+
 
     -- Attributes
     -- attribute mark_debug                              : string;
@@ -330,8 +403,8 @@ begin
     FpgaUserCDxB : block is
 
         signal ClkSys100MhzBufgxC : std_logic                                    := '0';
-        signal HCountIntxD        : std_logic_vector((C_DATA_SIZE - 1) downto 0) := std_logic_vector(C_VGA_CONFIG.HActivexD - 1);
-        signal VCountIntxD        : std_logic_vector((C_DATA_SIZE - 1) downto 0) := (others => '0');
+       -- signal HCountIntxD        : std_logic_vector((C_DATA_SIZE - 1) downto 0) := std_logic_vector(C_VGA_CONFIG.HActivexD - 1);
+        -- signal VCountIntxD        : std_logic_vector((C_DATA_SIZE - 1) downto 0) := (others => '0');
 
     begin  -- block FpgaUserCDxB
 
@@ -341,9 +414,14 @@ begin
         BramVideoMemoryWriteDataxAS : BramVideoMemoryWriteDataxD <= DataImGen2BramMVxD(23 downto 21) &
                                                                     DataImGen2BramMVxD(15 downto 13) &
                                                                     DataImGen2BramMVxD(7 downto 5);
+--
+--        BramVMWrAddrxAS : BramVideoMemoryWriteAddrxD <= VCountIntxD((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE - 1) downto 0) &
+--                                                        HCountIntxD((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE - 1) downto 0);
 
-        BramVMWrAddrxAS : BramVideoMemoryWriteAddrxD <= VCountIntxD((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE - 1) downto 0) &
-                                                        HCountIntxD((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE - 1) downto 0);
+        BramVMWrAddrxAS : BramVideoMemoryWriteAddrxD <= XscreenxD((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE - 1) downto 0) &
+                                                        YscreenxD((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE - 1) downto 0);
+
+
 
         BUFGClkSysToClkMandelxI : BUFG
             port map (
@@ -357,46 +435,108 @@ begin
                 PllLockedxSO    => PllLockedxS,
                 ClkSys100MhzxCI => ClkSys100MhzBufgxC);
 
-        LpscImageGeneratorxI : entity work.lpsc_image_generator
-            generic map (
-                C_DATA_SIZE  => C_DATA_SIZE,
-                C_PIXEL_SIZE => C_PIXEL_SIZE,
-                C_VGA_CONFIG => C_VGA_CONFIG)
-            port map (
-                ClkVgaxCI    => ClkMandelxC,
-                RstxRAI      => PllNotLockedxS,
-                PllLockedxSI => PllLockedxD(0),
-                HCountxDI    => HCountIntxD,
-                VCountxDI    => VCountIntxD,
-                VidOnxSI     => '1',
-                DataxDO      => DataImGen2BramMVxD,
-                Color1xDI    => RdDataFlagColor1xDP(((C_PIXEL_SIZE * 3) - 1) downto 0));
+	LpscMandelbrotCalculator : lpsc_mandelbrot_calculator_0
+		  PORT MAP (
+			  clk => ClkMandelxC,
+			  rst => PllNotLockedxS,
+			  ready => ReadyxS,
+			  start => StartxS,
+			  finished => FinishedxS,
+			  c_real => CrealxD,
+			  c_imaginary => CimaginaryxD,
+			  z_real => ZrealxD,
+			  z_imaginary => ZimaginaryxD,
+			  iterations => IterationsxD);
+	
+	LpscMandelbrotComplexValueGenerator : lpsc_mandelbrot_ComplexValueGenerator
+		port map (
+			clk => ClkMandelxC,
+			reset => PllNotLockedxS,
+			next_value => NextValuexS,
+			c_inc_RE => CincrexD,
+			c_inc_IM => CincimxD,
+			c_top_left_RE => CtopleftrexD,
+			c_top_left_IM => CtopleftimxD,
+			c_real => CrealxD,
+			c_imaginary => CimaginaryxD,
+			X_screen => XscreenxD,
+			Y_screen => YscreenxD
+		);
 
-        HVCountIntxP : process (all) is
-        begin  -- process HVCountxP
+--        LpscImageGeneratorxI : entity work.lpsc_image_generator
+--            generic map (
+--                C_DATA_SIZE  => C_DATA_SIZE,
+--                C_PIXEL_SIZE => C_PIXEL_SIZE,
+--                C_VGA_CONFIG => C_VGA_CONFIG)
+--            port map (
+--                ClkVgaxCI    => ClkMandelxC,
+--                RstxRAI      => PllNotLockedxS,
+--                PllLockedxSI => PllLockedxD(0),
+--                HCountxDI    => HCountIntxD,
+--                VCountxDI    => VCountIntxD,
+--                VidOnxSI     => '1',
+--                DataxDO      => DataImGen2BramMVxD,
+--                Color1xDI    => RdDataFlagColor1xDP(((C_PIXEL_SIZE * 3) - 1) downto 0));
 
-            if PllNotLockedxS = '1' then
-                HCountIntxD <= (others => '0');
-                VCountIntxD <= (others => '0');
-            elsif rising_edge(ClkMandelxC) then
-                HCountIntxD <= HCountIntxD;
-                VCountIntxD <= VCountIntxD;
+       -- HVCountIntxP : process (all) is
+       -- begin  -- process HVCountxP
 
-                if unsigned(HCountIntxD) = (C_VGA_CONFIG.HActivexD - 1) then
-                    HCountIntxD <= (others => '0');
+       --     if PllNotLockedxS = '1' then
+       --         HCountIntxD <= (others => '0');
+       --         VCountIntxD <= (others => '0');
+       --     elsif rising_edge(ClkMandelxC) then
+       --         HCountIntxD <= HCountIntxD;
+       --         VCountIntxD <= VCountIntxD;
 
-                    if unsigned(VCountIntxD) = (C_VGA_CONFIG.VActivexD - 1) then
-                        VCountIntxD <= (others => '0');
-                    else
-                        VCountIntxD <= std_logic_vector(unsigned(VCountIntxD) + 1);
-                    end if;
-                else
-                    HCountIntxD <= std_logic_vector(unsigned(HCountIntxD) + 1);
-                end if;
-            end if;
+       --         if unsigned(HCountIntxD) = (C_VGA_CONFIG.HActivexD - 1) then
+       --             HCountIntxD <= (others => '0');
 
-        end process HVCountIntxP;
+       --             if unsigned(VCountIntxD) = (C_VGA_CONFIG.VActivexD - 1) then
+       --                 VCountIntxD <= (others => '0');
+       --             else
+       --                 VCountIntxD <= std_logic_vector(unsigned(VCountIntxD) + 1);
+       --             end if;
+       --         else
+       --             HCountIntxD <= std_logic_vector(unsigned(HCountIntxD) + 1);
+       --         end if;
+       --     end if;
+
+       -- end process HVCountIntxP;
 
     end block FpgaUserCDxB;
+
+    state_machine : process(all) is
+    begin
+	if PllNotLockedxS = '1' then
+		--CrealxD <= (others => '0');
+		--CimaginaryxD <= (others => '0');
+		NextValuexS <= '0';
+		StartxS <= '0';
+	elsif rising_edge(ClkMandelxC) then
+		StartxS <= '0';
+		NextValuexS <= '0';
+		case StatexP is 
+			when idle =>
+				if ReadyxS = '1' then
+					StartxS <= '1';
+					StatexP <= iter;
+				else
+					StatexP <= idle;
+				end if;
+			when iter => 
+				if FinishedxS = '1' then
+	                		DataImGen2BramMVxD <=  x"ffffff" when unsigned(IterationsxD) < 127 else
+							       (others => '0');
+					
+					StatexP <= write_mem;
+				else
+					StatexP <= iter;
+				end if;
+			when write_mem =>
+				StatexP <= idle;
+				NextValuexS <= '1';
+		end case;
+	end if;
+    end process state_machine;
 
 end arch;
