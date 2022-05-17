@@ -87,13 +87,13 @@ architecture arch of lpsc_mandelbrot_firmware is
     -- 640x480
 
     -- constant C_VGA_CONFIG : t_VgaConfig := C_1024x768_VGACONFIG;
-    -- constant C_VGA_CONFIG : t_VgaConfig := C_1024x600_VGACONFIG;
-    constant C_VGA_CONFIG : t_VgaConfig := C_800x600_VGACONFIG;
+     constant C_VGA_CONFIG : t_VgaConfig := C_1024x600_VGACONFIG;
+    -- constant C_VGA_CONFIG : t_VgaConfig := C_800x600_VGACONFIG;
     -- constant C_VGA_CONFIG : t_VgaConfig := C_640x480_VGACONFIG;
 
     -- constant C_RESOLUTION : string := "1024x768";
-    -- constant C_RESOLUTION : string := "1024x600";
-    constant C_RESOLUTION : string := "800x600";
+    constant C_RESOLUTION : string := "1024x600";
+    --constant C_RESOLUTION : string := "800x600";
     constant C_INC_RE	  : std_logic_vector(17 downto 0) := "000000000000111101";
     constant C_INC_IM	  : std_logic_vector(17 downto 0) := "000000000000110111";
     -- constant C_RESOLUTION : string := "640x480";
@@ -183,7 +183,12 @@ architecture arch of lpsc_mandelbrot_firmware is
             doutb : out std_logic_vector(8 downto 0));
     end component;
 
-    COMPONENT lpsc_mandelbrot_calculator_0
+    COMPONENT lpsc_mandelbrot_calculator_comp
+    		generic(
+		comma : integer := 14;
+		max_iter : integer := 150;
+		SIZE : integer := 18
+		);
 	  PORT (
     		clk : IN STD_LOGIC;
     		rst : IN STD_LOGIC;
@@ -200,7 +205,7 @@ architecture arch of lpsc_mandelbrot_firmware is
     	component lpsc_mandelbrot_ComplexValueGenerator is
 		generic(
 			SIZE       : integer := 18;  -- Taille en bits de nombre au format virgule fixe
-			X_SIZE     : integer := 800;  -- Taille en X (Nombre de pixel) de la fractale à afficher
+			X_SIZE     : integer := 1024;  -- Taille en X (Nombre de pixel) de la fractale à afficher
 			Y_SIZE     : integer := 600;  -- Taille en Y (Nombre de pixel) de la fractale à afficher
 			SCREEN_RES : integer := 10);  -- Nombre de bit pour les vecteurs X et Y de la position du pixel
 
@@ -278,8 +283,8 @@ architecture arch of lpsc_mandelbrot_firmware is
 
     -- Tests signaux generator
     signal NextValuexS		: std_logic := '0';
-    signal CincrexD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := (others => '0');
-    signal CincimxD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := (others => '0');
+    signal CincrexD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := C_INC_RE;  -- (others => '0');
+    signal CincimxD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := C_INC_IM; -- (others => '0');
     signal CtopleftrexD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := "111000000000000000";
     signal CtopleftimxD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := "000100000000000000";
     --signal CrealxD		: std_logic_vector((SIZE -1) downto 0) := (others => '0');
@@ -418,8 +423,8 @@ begin
 --        BramVMWrAddrxAS : BramVideoMemoryWriteAddrxD <= VCountIntxD((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE - 1) downto 0) &
 --                                                        HCountIntxD((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE - 1) downto 0);
 
-        BramVMWrAddrxAS : BramVideoMemoryWriteAddrxD <= XscreenxD((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE - 1) downto 0) &
-                                                        YscreenxD((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE - 1) downto 0);
+        BramVMWrAddrxAS : BramVideoMemoryWriteAddrxD <= YscreenxD((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE - 1) downto 0) &
+                                                        XscreenxD((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE - 1) downto 0);
 
 
 
@@ -435,7 +440,7 @@ begin
                 PllLockedxSO    => PllLockedxS,
                 ClkSys100MhzxCI => ClkSys100MhzBufgxC);
 
-	LpscMandelbrotCalculator : lpsc_mandelbrot_calculator_0
+	LpscMandelbrotCalculator : lpsc_mandelbrot_calculator_comp
 		  PORT MAP (
 			  clk => ClkMandelxC,
 			  rst => PllNotLockedxS,
@@ -525,7 +530,7 @@ begin
 				end if;
 			when iter => 
 				if FinishedxS = '1' then
-	                		DataImGen2BramMVxD <=  x"ffffff" when unsigned(IterationsxD) < 127 else
+	                		DataImGen2BramMVxD <=  x"ffffff" when unsigned(IterationsxD) <= 150 else
 							       (others => '0');
 					
 					StatexP <= write_mem;

@@ -1,7 +1,7 @@
 -- Copyright 1986-2021 Xilinx, Inc. All Rights Reserved.
 -- --------------------------------------------------------------------------------
 -- Tool Version: Vivado v.2021.2 (lin64) Build 3367213 Tue Oct 19 02:47:39 MDT 2021
--- Date        : Sun Apr 24 17:35:35 2022
+-- Date        : Mon May 16 20:49:47 2022
 -- Host        : pierrick-Aspire-A515-54G running 64-bit Linux Mint 20
 -- Command     : write_vhdl -force -mode synth_stub
 --               /home/pierrick/LPSC_workspace/lpsc-mandelbrot/ips/hw/lpsc_clk_mandelbrot/src/ip_core/clk_mandelbrot/clk_mandelbrot_stub.vhdl
