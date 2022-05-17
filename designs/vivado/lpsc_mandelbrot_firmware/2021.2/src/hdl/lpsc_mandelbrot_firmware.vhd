@@ -186,7 +186,7 @@ architecture arch of lpsc_mandelbrot_firmware is
     COMPONENT lpsc_mandelbrot_calculator_comp
     		generic(
 		comma : integer := 14;
-		max_iter : integer := 150;
+		max_iter : integer := 127;
 		SIZE : integer := 18
 		);
 	  PORT (
@@ -530,8 +530,8 @@ begin
 				end if;
 			when iter => 
 				if FinishedxS = '1' then
-	                		DataImGen2BramMVxD <=  x"ffffff" when unsigned(IterationsxD) <= 150 else
-							       (others => '0');
+	                		DataImGen2BramMVxD <=  x"000000" when unsigned(IterationsxD) > 127 else
+							       x"00" & IterationsxD(6 downto 0) & '1' & x"FF";
 					
 					StatexP <= write_mem;
 				else
