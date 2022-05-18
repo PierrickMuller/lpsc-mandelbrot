@@ -33,7 +33,7 @@ end tb_lpsc_mandelbrot_firmware;
 architecture behavioral of tb_lpsc_mandelbrot_firmware is
 
 	constant C_CLK_PERIOD : time    := 10 ns;
-	constant C_NB_TEST    : integer := 10000;
+	constant C_NB_TEST    : integer := 10;
 
 	component lpsc_mandelbrot_firmware is
 
