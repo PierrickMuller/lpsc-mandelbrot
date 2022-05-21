@@ -287,7 +287,7 @@ architecture arch of lpsc_mandelbrot_firmware is
     signal IterationsxD		: std_logic_vector(17 downto 0)			    := (others => '0');
    
     -- Signaux machine d'état 
-    type States is (idle,iter,write_mem,next_val);
+    type States is (idle,iter,write_mem,write_mem_2,next_val);
     signal StatexP,State1xP : States := idle;
 
     -- Tests signaux generator
@@ -320,7 +320,15 @@ architecture arch of lpsc_mandelbrot_firmware is
     signal NextValue1xS		: std_logic := '0';
 
   
+    -- Attributes
+    attribute keep                            : string;
+    attribute mark_debug                      : string;
 
+    attribute mark_debug of XscreenHDMIxD     : signal is "true";
+    attribute keep of XscreenHDMIxD	      : signal is "true";
+    attribute mark_debug of YscreenHDMIxD     : signal is "true";
+    attribute keep of YscreenHDMIxD	      : signal is "true";
+    
     -- Attributes
     -- attribute mark_debug                              : string;
     -- attribute mark_debug of DebugFlagColor1RegPortxDP : signal is "true";
@@ -558,7 +566,9 @@ begin
 				else
 					StatexP <= iter;
 				end if;
-			when write_mem =>
+			when write_mem => 
+				StatexP <= write_mem_2;
+			when write_mem_2 =>
 				StatexP <= idle;
 				--NextValuexS <= '1';
 		end case;
@@ -595,36 +605,51 @@ begin
 				else
 					State1xP <= iter;
 				end if;
-			when write_mem =>
+			when write_mem => 
+				State1xP <= write_mem_2;
+			when write_mem_2 =>
 				State1xP <= idle;
+				
 				--NextValuexS <= '1';
 		end case;
 	end if;
     end process state_machine_2;
 
---NextValuexS <= '1' when (NextValue0xS = '1' or NextValue1xS = '1') else
---		'0';
---XscreenHDMIxD <= XscreenHDMIcalc0xD when FinishedxS = '1' or StatexP = write_mem else
---		 XscreenHDMIcalc1xD when Finished1xS = '1' or State1xP = write_mem else
---		 XscreenHDMIxD;
---YscreenHDMIxD <= YscreenHDMIcalc0xD when FinishedxS = '1' or StatexP = write_mem else
---		 YscreenHDMIcalc1xD when Finished1xS = '1' or State1xP = write_mem else
---		 YscreenHDMIxD;
---DataImGen2BramMVxD <= DataImGen2BramMV0xD when FinishedxS = '1' or StatexP = write_mem else
---		      DataImGen2BramMV1xD when Finished1xS = '1' or State1xP = write_mem else
---		      DataImGen2BramMVxD; 
-
-NextValuexS <= '1' when (StatexP = next_val or State1xP = next_val) else
+    state_machine_hdmi : process(all) is
+    begin
+    	if PllNotLockedxS = '1' then
+		NextValuexS <= '0';
+		XscreenHDMIxD <= (others => '0');
+		YscreenHDMIxD <= (others => '0');
+	elsif rising_edge(ClkMandelxC) then
+		--NextValuexS <= '1' when (NextValue0xS = '1' or NextValue1xS = '1') else --(StatexP = next_val or State1xP = next_val) else
+		--'0';
+		NextValuexS <= '1' when (StatexP = next_val or State1xP = next_val) else
 		'0';
-XscreenHDMIxD <= XscreenHDMIcalc0xD when StatexP = write_mem else
-		 XscreenHDMIcalc1xD when State1xP = write_mem else
-		 XscreenHDMIxD;
-YscreenHDMIxD <= YscreenHDMIcalc0xD when StatexP = write_mem else
-		 YscreenHDMIcalc1xD when State1xP = write_mem else
-		 YscreenHDMIxD;
-DataImGen2BramMVxD <= DataImGen2BramMV0xD when StatexP = write_mem else
-		      DataImGen2BramMV1xD when State1xP = write_mem else
-		      DataImGen2BramMVxD; 
+		XscreenHDMIxD <= XscreenHDMIcalc0xD when StatexP = write_mem else
+				XscreenHDMIcalc1xD when State1xP = write_mem else
+		 		XscreenHDMIxD;
+		YscreenHDMIxD <= YscreenHDMIcalc0xD when StatexP = write_mem else
+				YscreenHDMIcalc1xD when State1xP = write_mem else
+		 		YscreenHDMIxD;
+		DataImGen2BramMVxD <= DataImGen2BramMV0xD when StatexP = write_mem else
+		      		DataImGen2BramMV1xD when State1xP = write_mem else
+		      		DataImGen2BramMVxD; 
+	end if;
+    end process state_machine_hdmi;
+
+
+--NextValuexS <= '1' when (StatexP = next_val or State1xP = next_val) else
+--		'0';
+--XscreenHDMIxD <= XscreenHDMIcalc0xD when StatexP = write_mem else
+--		 XscreenHDMIcalc1xD when State1xP = write_mem else
+--		 XscreenHDMIxD;
+--YscreenHDMIxD <= YscreenHDMIcalc0xD when StatexP = write_mem else
+--		 YscreenHDMIcalc1xD when State1xP = write_mem else
+--		 YscreenHDMIxD;
+--DataImGen2BramMVxD <= DataImGen2BramMV0xD when StatexP = write_mem else
+--		      DataImGen2BramMV1xD when State1xP = write_mem else
+--		      DataImGen2BramMVxD; 
 
 
 end arch;
