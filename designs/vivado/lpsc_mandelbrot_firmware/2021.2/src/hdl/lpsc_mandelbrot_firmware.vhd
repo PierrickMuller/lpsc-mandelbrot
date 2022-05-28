@@ -116,6 +116,8 @@ architecture arch of lpsc_mandelbrot_firmware is
     constant C_FIFO_PARITY_SIZE                 : integer               := 4;
     constant C_OUTPUT_BUFFER                    : boolean               := false;
 
+    constant NB_CALCULATORS			: integer		:= 3;
+
     -- Components
 
     component hdmi is
@@ -213,7 +215,7 @@ architecture arch of lpsc_mandelbrot_firmware is
 
     	component lpsc_mandelbrot_ComplexValueGenerator is
 		generic(
-			SIZE       : integer := 18;  -- Taille en bits de nombre au format virgule fixe
+			SIZE       : integer := C_DATA_SIZE; -- Taille en bits de nombre au format virgule fixe
 			X_SIZE     : integer := 1024;  -- Taille en X (Nombre de pixel) de la fractale à afficher
 			Y_SIZE     : integer := 600;  -- Taille en Y (Nombre de pixel) de la fractale à afficher
 			SCREEN_RES : integer := 10);  -- Nombre de bit pour les vecteurs X et Y de la position du pixel
@@ -257,6 +259,14 @@ architecture arch of lpsc_mandelbrot_firmware is
     -- Others
     signal DataImGen2HDMIxD     : std_logic_vector(((C_PIXEL_SIZE * 3) - 1) downto 0);
     signal DataImGen2BramMVxD         : std_logic_vector(((C_PIXEL_SIZE * 3) - 1) downto 0);
+
+    type t_DataImGen2Bram is array((NB_CALCULATORS -1 ) downto 0) of std_logic_vector(((C_PIXEL_SIZE * 3) - 1) downto 0);
+    type t_ArrayIter is array((NB_CALCULATORS -1) downto 0) of std_logic_vector(17 downto 0);	
+    type t_ArrayScreenHdmiY is array((NB_CALCULATORS -1) downto 0) of std_logic_vector((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE -1) downto 0) ;
+    type t_ArrayScreenHdmiX is array((NB_CALCULATORS -1) downto 0) of std_logic_vector((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE -1) downto 0) ;
+
+    signal DataImGen2BramMVArrayxD    : t_DataImGen2Bram;
+
     signal DataBramMV2HdmixD          : std_logic_vector(((C_PIXEL_SIZE * 3) - 1) downto 0);
     signal HdmiSourcexD         : t_HdmiSource                                      := C_NO_HDMI_SOURCE;
     signal BramVideoMemoryWriteAddrxD : std_logic_vector((C_BRAM_VIDEO_MEMORY_ADDR_SIZE - 1) downto 0) := (others => '0');
@@ -277,49 +287,40 @@ architecture arch of lpsc_mandelbrot_firmware is
     signal RdDataFlagColor1xDN  : std_logic_vector((C_FIFO_DATA_SIZE - 1) downto 0) := x"003a8923";
 
     -- Tests signals Calculator
-    signal ReadyxS		: std_logic					    := '0';
-    signal StartxS		: std_logic					    := '0';
-    signal FinishedxS		: std_logic					    := '0';
-    signal CrealxD		: std_logic_vector(17 downto 0)			    := (others => '0');
-    signal CimaginaryxD		: std_logic_vector(17 downto 0)			    := (others => '0');
-    signal ZrealxD		: std_logic_vector(17 downto 0)			    := (others => '0');
-    signal ZimaginaryxD		: std_logic_vector(17 downto 0)			    := (others => '0');
-    signal IterationsxD		: std_logic_vector(17 downto 0)			    := (others => '0');
+    signal ReadyxS		: std_logic_vector((NB_CALCULATORS-1) downto 0)	    := (others => '0');
+    signal StartxS		: std_logic_vector((NB_CALCULATORS-1) downto 0)	    := (others => '0');
+    signal FinishedxS		: std_logic_vector((NB_CALCULATORS-1) downto 0)	    := (others => '0');
+    signal CrealxD		: std_logic_vector((C_DATA_SIZE - 1) downto 0)	    := (others => '0');
+    signal CimaginaryxD		: std_logic_vector((C_DATA_SIZE - 1) downto 0)	    := (others => '0');
+    signal IterationsxD		: t_ArrayIter := (others => (others => '0'));
    
     -- Signaux machine d'état 
     type States is (idle,iter,write_mem,write_mem_2,next_val);
-    signal StatexP,State1xP : States := idle;
-
+    type StatesArray is array((NB_CALCULATORS -1) downto 0) of States;
+    signal StatexP,State1xP : StatesArray := (others => idle);
+  
     -- Tests signaux generator
     signal NextValuexS		: std_logic := '0';
-    signal CincrexD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := C_INC_RE;  -- (others => '0');
-    signal CincimxD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := C_INC_IM; -- (others => '0');
+    signal CincrexD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := C_INC_RE;  
+    signal CincimxD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := C_INC_IM; 
     signal CtopleftrexD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := "111000000000000000";
     signal CtopleftimxD		: std_logic_vector((C_DATA_SIZE -1) downto 0) := "000100000000000000";
-    --signal CrealxD		: std_logic_vector((SIZE -1) downto 0) := (others => '0');
-    --signal CimaginaryxD		: std_logic_vector((SIZE -1) downto 0) := (others => '0');
     signal XscreenxD		: std_logic_vector((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE -1) downto 0) := (others => '0');
     signal YscreenxD		: std_logic_vector((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE -1) downto 0) := (others => '0');
-    signal XscreenHDMIxD		: std_logic_vector((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE -1) downto 0) := (others => '0');
-    signal YscreenHDMIxD		: std_logic_vector((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE -1) downto 0) := (others => '0');
-    signal XscreenHDMIcalc0xD		: std_logic_vector((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE -1) downto 0) := (others => '0');
-    signal YscreenHDMIcalc0xD		: std_logic_vector((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE -1) downto 0) := (others => '0');
-    signal BusyxS		: std_logic;
+    signal XscreenHDMIxD	: std_logic_vector((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE -1) downto 0) := (others => '0');
+    signal YscreenHDMIxD	: std_logic_vector((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE -1) downto 0) := (others => '0');
+    
+    signal XscreenHDMIcalcxD	: t_ArrayScreenHdmiX := (others => (others => '0'));
+    signal YscreenHDMIcalcxD	: t_ArrayScreenHdmiY := (others => (others => '0'));
+    signal BusyxS		: std_logic_vector((NB_CALCULATORS - 1) downto 0) := (others => '0');
 
+    signal OtherFinishedxS	: std_logic_vector((NB_CALCULATORS - 1) downto 0) := (others => '0');
 
-    signal Busy1xS		: std_logic;
-    signal XscreenHDMIcalc1xD		: std_logic_vector((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE -1) downto 0) := (others => '0');
-    signal YscreenHDMIcalc1xD		: std_logic_vector((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE -1) downto 0) := (others => '0');
-    signal Ready1xS		: std_logic					    := '0';
-    signal Start1xS		: std_logic					    := '0';
-    signal Finished1xS		: std_logic					    := '0';
-    signal Iterations1xD		: std_logic_vector(17 downto 0)			    := (others => '0');
-    signal DataImGen2BramMV0xD         : std_logic_vector(((C_PIXEL_SIZE * 3) - 1) downto 0);
-    signal DataImGen2BramMV1xD         : std_logic_vector(((C_PIXEL_SIZE * 3) - 1) downto 0);
-    signal NextValue0xS		: std_logic := '0';
-    signal NextValue1xS		: std_logic := '0';
+    -- Debug signals 
+    signal CounterclkxS		: std_logic_vector(31 downto 0)			    := (others => '0');
+    signal CyclefinishedxS	: std_logic					    := '0';
+    
 
-  
     -- Attributes
     attribute keep                            : string;
     attribute mark_debug                      : string;
@@ -328,7 +329,26 @@ architecture arch of lpsc_mandelbrot_firmware is
     attribute keep of XscreenHDMIxD	      : signal is "true";
     attribute mark_debug of YscreenHDMIxD     : signal is "true";
     attribute keep of YscreenHDMIxD	      : signal is "true";
+    attribute mark_debug of CounterclkxS      : signal is "true";
+    attribute keep of CounterclkxS	      : signal is "true";
+    attribute mark_debug of CyclefinishedxS   : signal is "true";
+    attribute keep of CyclefinishedxS	      : signal is "true";
+
+    attribute mark_debug of BusyxS	      : signal is "true";
+    attribute keep of BusyxS		      : signal is "true";
+    attribute mark_debug of ReadyxS	      : signal is "true";
+    attribute keep of ReadyxS		      : signal is "true";
+    attribute mark_debug of StatexP	      : signal is "true";
+    attribute keep of StatexP		      : signal is "true";
+    attribute mark_debug of FinishedxS	      : signal is "true";
+    attribute keep of FinishedxS	      : signal is "true";
+    attribute mark_debug of OtherFinishedxS   : signal is "true";
+    attribute keep of OtherFinishedxS	      : signal is "true";
     
+    attribute mark_debug of ClkMandelxC       : signal is "true";
+    attribute keep of ClkMandelxC	      : signal is "true";
+    
+     
     -- Attributes
     -- attribute mark_debug                              : string;
     -- attribute mark_debug of DebugFlagColor1RegPortxDP : signal is "true";
@@ -443,8 +463,6 @@ begin
     FpgaUserCDxB : block is
 
         signal ClkSys100MhzBufgxC : std_logic                                    := '0';
-       -- signal HCountIntxD        : std_logic_vector((C_DATA_SIZE - 1) downto 0) := std_logic_vector(C_VGA_CONFIG.HActivexD - 1);
-        -- signal VCountIntxD        : std_logic_vector((C_DATA_SIZE - 1) downto 0) := (others => '0');
 
     begin  -- block FpgaUserCDxB
 
@@ -454,9 +472,6 @@ begin
         BramVideoMemoryWriteDataxAS : BramVideoMemoryWriteDataxD <= DataImGen2BramMVxD(23 downto 21) &
                                                                     DataImGen2BramMVxD(15 downto 13) &
                                                                     DataImGen2BramMVxD(7 downto 5);
---
---        BramVMWrAddrxAS : BramVideoMemoryWriteAddrxD <= VCountIntxD((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE - 1) downto 0) &
---                                                        HCountIntxD((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE - 1) downto 0);
 
         BramVMWrAddrxAS : BramVideoMemoryWriteAddrxD <= YscreenHDMIxD((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE - 1) downto 0) &
                                                         XscreenHDMIxD((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE - 1) downto 0);
@@ -475,47 +490,6 @@ begin
                 PllLockedxSO    => PllLockedxS,
                 ClkSys100MhzxCI => ClkSys100MhzBufgxC);
 
-	LpscMandelbrotCalculator_0 : lpsc_mandelbrot_calculator_comp
-		  PORT MAP (
-			  clk => ClkMandelxC,
-			  rst => PllNotLockedxS,
-			  ready => ReadyxS,
-			  start => StartxS,
-			  finished => FinishedxS,
-			  c_real => CrealxD,
-			  c_imaginary => CimaginaryxD,
-			  z_real => ZrealxD,
-			  z_imaginary => ZimaginaryxD,
-			  iterations => IterationsxD,
-			  x_screen => XscreenxD,
-			  y_screen => YscreenxD,
-		 	  x_screen_out => XscreenHDMIcalc0xD,
-			  y_screen_out => YscreenHDMIcalc0xD,
-			  other_finished => '0',
-			  busy  => BusyxS
-			);
-
-	LpscMandelbrotCalculator_1 : lpsc_mandelbrot_calculator_comp
-		  PORT MAP (
-			  clk => ClkMandelxC,
-			  rst => PllNotLockedxS,
-			  ready => Ready1xS,
-			  start => Start1xS,
-			  finished => Finished1xS,
-			  c_real => CrealxD,
-			  c_imaginary => CimaginaryxD,
-			  z_real => open,
-			  z_imaginary => open,
-			  iterations => Iterations1xD,
-			  x_screen => XscreenxD,
-			  y_screen => YscreenxD,
-		 	  x_screen_out => XscreenHDMIcalc1xD,
-			  y_screen_out => YscreenHDMIcalc1xD,
-			  other_finished => FinishedxS,
-			  busy  => Busy1xS
-			);
-
-
 	LpscMandelbrotComplexValueGenerator : lpsc_mandelbrot_ComplexValueGenerator
 		port map (
 			clk => ClkMandelxC,
@@ -532,88 +506,102 @@ begin
 		);
 
 
+	GEN_CALCS : for I in 0 to (NB_CALCULATORS - 1 ) generate
+
+		FIRST_CALC : if I = 0 generate
+			LpscMandelbrotCalculator_0 : lpsc_mandelbrot_calculator_comp
+		  		PORT MAP (
+			 		 clk => ClkMandelxC,
+			 		 rst => PllNotLockedxS,
+			 		 ready => ReadyxS(I),
+			 		 start => StartxS(I),
+			 		 finished => FinishedxS(I),
+			 		 c_real => CrealxD,
+			 		 c_imaginary => CimaginaryxD,
+			 		 z_real => open,
+			 		 z_imaginary => open,
+			 		 iterations => IterationsxD(I),
+			 		 x_screen => XscreenxD,
+			 		 y_screen => YscreenxD,
+		 	 		 x_screen_out => XscreenHDMIcalcxD(I),
+			 		 y_screen_out => YscreenHDMIcalcxD(I),
+			 		 other_finished => '0',
+			 		 busy  => BusyxS(I)
+				);
+		end generate FIRST_CALC;
+
+		OTHER_CALC : IF I > 0 generate
+			OtherFinishedxS(I) <= '0' when unsigned(FinishedxS(I-1 downto 0)) = 0 else
+					   '1';
+			LpscMandelbrotCalculator_X : lpsc_mandelbrot_calculator_comp
+		  		PORT MAP (
+			 		 clk => ClkMandelxC,
+			 		 rst => PllNotLockedxS,
+			 		 ready => ReadyxS(I),
+			 		 start => StartxS(I),
+			 		 finished => FinishedxS(I),
+			 		 c_real => CrealxD,
+			 		 c_imaginary => CimaginaryxD,
+			 		 z_real => open,
+			 		 z_imaginary => open,
+			 		 iterations => IterationsxD(I),
+			 		 x_screen => XscreenxD,
+			 		 y_screen => YscreenxD,
+		 	 		 x_screen_out => XscreenHDMIcalcxD(I),
+			 		 y_screen_out => YscreenHDMIcalcxD(I),
+			 		 other_finished => OtherFinishedxS(I),
+			 		 busy  => BusyxS(I)
+				);	
+		end generate OTHER_CALC;
+	end generate GEN_CALCS;
+
+
     end block FpgaUserCDxB;
 
-    state_machine : process(all) is
-    begin
-	if PllNotLockedxS = '1' then
-		--CrealxD <= (others => '0');
-		--CimaginaryxD <= (others => '0');
-		NextValue0xS <= '0';
-		StartxS <= '0';
-	elsif rising_edge(ClkMandelxC) then
-		StartxS <= '0';
-		NextValue0xS <= '0';
-		case StatexP is 
-			when idle =>
-				if ReadyxS = '1' then
-					StartxS <= '1';
-					StatexP <= next_val;
-				else
-					StatexP <= idle;
-				end if;
-			when next_val => 
-				NextValue0xS <= '1';
-				StatexP <= iter;
-			when iter => 
-				if FinishedxS = '1' then
-					--XscreenHDMIxD <= XscreenHDMIcalc0xD;
-					--YscreenHDMIxD <= YscreenHDMIcalc0xD;
-	                		DataImGen2BramMV0xD <=  x"000000" when unsigned(IterationsxD) > 127 else
-							       x"00" & IterationsxD(6 downto 0) & '1' & x"FF";
-					
-					StatexP <= write_mem;
-				else
-					StatexP <= iter;
-				end if;
-			when write_mem => 
-				StatexP <= write_mem_2;
-			when write_mem_2 =>
-				StatexP <= idle;
-				--NextValuexS <= '1';
-		end case;
-	end if;
-    end process state_machine;
-    
-    state_machine_2 : process(all) is
-    begin
-	if PllNotLockedxS = '1' then
-		NextValue1xS <= '0';
-		Start1xS <= '0';
-	elsif rising_edge(ClkMandelxC) then
-		Start1xS <= '0';
-		NextValue1xS <= '0';
-		case State1xP is 
-			when idle =>
-				if Ready1xS = '1' and BusyxS = '1' then
-					Start1xS <= '1';
-					State1xP <= next_val;
-				else
-					State1xP <= idle;
-				end if;
-			when next_val => 
-				NextValue1xS <= '1';
-				State1xP <= iter;
-			when iter => 
-				if Finished1xS = '1' and FinishedxS = '0' then
-					--XscreenHDMIxD <= XscreenHDMIcalc1xD;
-					--YscreenHDMIxD <= YscreenHDMIcalc1xD;
-	                		DataImGen2BramMV1xD <=  x"000000" when unsigned(Iterations1xD) > 127 else
-							       x"00" & Iterations1xD(6 downto 0) & '1' & x"FF";
-					
-					State1xP <= write_mem;
-				else
-					State1xP <= iter;
-				end if;
-			when write_mem => 
-				State1xP <= write_mem_2;
-			when write_mem_2 =>
-				State1xP <= idle;
-				
-				--NextValuexS <= '1';
-		end case;
-	end if;
-    end process state_machine_2;
+    GEN_SM_CALCS : for I in 0 to (NB_CALCULATORS-1) generate
+    	sm_calc_X : process(all) is
+	begin
+		if PllNotLockedxS = '1' then
+			StartxS(I) <= '0';
+		elsif rising_edge(ClkMandelxC) then
+			StartxS(I) <= '0';
+			case StatexP(I) is 
+				when idle =>
+					if ReadyxS(I) = '1' then
+						if I = 0 or (unsigned(BusyxS(I-1 downto 0)) = (2**I-1)) then 
+							StartxS(I) <= '1';
+							StatexP(I) <= next_val;
+						else
+							StatexP(I) <= idle;
+						end if;
+					else
+						StatexP(I) <= idle;
+					end if;
+				when next_val => 
+					StatexP(I) <= iter;
+				when iter => 
+					if FinishedxS(I) = '1' then
+						if I = 0 or (unsigned(FinishedxS(I-1 downto 0)) = 0) then
+		                			DataImGen2BramMVArrayxD(I) <=  x"000000" when unsigned(IterationsxD(I)) > 127 else
+								       x"00" & IterationsxD(I)(6 downto 0) & '1' & x"FF";
+						
+							StatexP(I) <= write_mem;
+						else
+							Statexp(I) <= iter;
+						end if;
+					else
+						StatexP(I) <= iter;
+					end if;
+				when write_mem => 
+					StatexP(I) <= write_mem_2;
+				when write_mem_2 =>
+					StatexP(I) <= idle;
+			end case;
+		end if;
+	
+	end process sm_calc_X;
+    end generate GEN_SM_CALCS;
+
 
     state_machine_hdmi : process(all) is
     begin
@@ -622,34 +610,36 @@ begin
 		XscreenHDMIxD <= (others => '0');
 		YscreenHDMIxD <= (others => '0');
 	elsif rising_edge(ClkMandelxC) then
-		--NextValuexS <= '1' when (NextValue0xS = '1' or NextValue1xS = '1') else --(StatexP = next_val or State1xP = next_val) else
-		--'0';
-		NextValuexS <= '1' when (StatexP = next_val or State1xP = next_val) else
-		'0';
-		XscreenHDMIxD <= XscreenHDMIcalc0xD when StatexP = write_mem else
-				XscreenHDMIcalc1xD when State1xP = write_mem else
-		 		XscreenHDMIxD;
-		YscreenHDMIxD <= YscreenHDMIcalc0xD when StatexP = write_mem else
-				YscreenHDMIcalc1xD when State1xP = write_mem else
-		 		YscreenHDMIxD;
-		DataImGen2BramMVxD <= DataImGen2BramMV0xD when StatexP = write_mem else
-		      		DataImGen2BramMV1xD when State1xP = write_mem else
-		      		DataImGen2BramMVxD; 
+		NextValuexS <= '0';
+		XscreenHDMIxD <= XscreenHDMIxD;
+		YscreenHDMIxD <= YscreenHDMIxD;
+		DataImGen2BramMVxD <= DataImGen2BramMVxD;
+		for i in 0 to (NB_CALCULATORS-1) loop
+			if StatexP(I) = next_val then
+				NextValuexS <= '1';
+			end if;
+
+			if StatexP(I) = write_mem then
+				XscreenHDMIxD <= XscreenHDMIcalcxD(I);
+				YscreenHDMIxD <= YscreenHDMIcalcxD(I);
+				DataImGen2BramMVxD <= DataImGen2BramMVArrayxD(I);
+			end if;		
+		
+		end loop;
 	end if;
     end process state_machine_hdmi;
 
-
---NextValuexS <= '1' when (StatexP = next_val or State1xP = next_val) else
---		'0';
---XscreenHDMIxD <= XscreenHDMIcalc0xD when StatexP = write_mem else
---		 XscreenHDMIcalc1xD when State1xP = write_mem else
---		 XscreenHDMIxD;
---YscreenHDMIxD <= YscreenHDMIcalc0xD when StatexP = write_mem else
---		 YscreenHDMIcalc1xD when State1xP = write_mem else
---		 YscreenHDMIxD;
---DataImGen2BramMVxD <= DataImGen2BramMV0xD when StatexP = write_mem else
---		      DataImGen2BramMV1xD when State1xP = write_mem else
---		      DataImGen2BramMVxD; 
+    state_machine_debug : process(all) is 
+    begin
+    	if rising_edge(ClkMandelxC) then
+		CyclefinishedxS <= '0';
+		CounterclkxS <= std_logic_vector(unsigned(CounterclkxS) + 1);
+		if (unsigned(YscreenHDMIxD) = 599 and unsigned(XscreenHDMIxD) = 1023) then
+			CyclefinishedxS <= '1';
+			CounterclkxS <= (others => '0');
+		end if;
+	end if;
+    end process state_machine_debug;
 
 
 end arch;
