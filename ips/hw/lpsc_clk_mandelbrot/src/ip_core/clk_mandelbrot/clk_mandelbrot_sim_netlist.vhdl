@@ -1,10 +1,10 @@
 -- Copyright 1986-2021 Xilinx, Inc. All Rights Reserved.
 -- --------------------------------------------------------------------------------
 -- Tool Version: Vivado v.2021.2 (lin64) Build 3367213 Tue Oct 19 02:47:39 MDT 2021
--- Date        : Wed May 18 19:36:58 2022
+-- Date        : Wed May 18 19:36:57 2022
 -- Host        : pierrick-Aspire-A515-54G running 64-bit Linux Mint 20
--- Command     : write_vhdl -force -mode funcsim
---               /home/pierrick/LPSC_workspace/lpsc-mandelbrot/ips/hw/lpsc_clk_mandelbrot/src/ip_core/clk_mandelbrot/clk_mandelbrot_sim_netlist.vhdl
+-- Command     : write_vhdl -force -mode funcsim -rename_top clk_mandelbrot -prefix
+--               clk_mandelbrot_ clk_mandelbrot_sim_netlist.vhdl
 -- Design      : clk_mandelbrot
 -- Purpose     : This VHDL netlist is a functional simulation representation of the design and should not be modified or
 --               synthesized. This netlist cannot be used for SDF annotated simulation.
@@ -14,16 +14,16 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 library UNISIM;
 use UNISIM.VCOMPONENTS.ALL;
-entity clk_mandelbrot_clk_wiz is
+entity clk_mandelbrot_clk_mandelbrot_clk_wiz is
   port (
     ClkMandelxCO : out STD_LOGIC;
     reset : in STD_LOGIC;
     PllLockedxSO : out STD_LOGIC;
     ClkSys100MhzxCI : in STD_LOGIC
   );
-end clk_mandelbrot_clk_wiz;
+end clk_mandelbrot_clk_mandelbrot_clk_wiz;
 
-architecture STRUCTURE of clk_mandelbrot_clk_wiz is
+architecture STRUCTURE of clk_mandelbrot_clk_mandelbrot_clk_wiz is
   signal ClkMandelxCO_clk_mandelbrot : STD_LOGIC;
   signal ClkSys100MhzxCI_clk_mandelbrot : STD_LOGIC;
   signal clkfbout_buf_clk_mandelbrot : STD_LOGIC;
@@ -178,7 +178,7 @@ end clk_mandelbrot;
 
 architecture STRUCTURE of clk_mandelbrot is
 begin
-inst: entity work.clk_mandelbrot_clk_wiz
+inst: entity work.clk_mandelbrot_clk_mandelbrot_clk_wiz
      port map (
       ClkMandelxCO => ClkMandelxCO,
       ClkSys100MhzxCI => ClkSys100MhzxCI,

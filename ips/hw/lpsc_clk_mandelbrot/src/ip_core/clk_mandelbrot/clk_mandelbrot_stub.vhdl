@@ -1,10 +1,10 @@
 -- Copyright 1986-2021 Xilinx, Inc. All Rights Reserved.
 -- --------------------------------------------------------------------------------
 -- Tool Version: Vivado v.2021.2 (lin64) Build 3367213 Tue Oct 19 02:47:39 MDT 2021
--- Date        : Wed May 18 19:36:58 2022
+-- Date        : Wed May 18 19:36:57 2022
 -- Host        : pierrick-Aspire-A515-54G running 64-bit Linux Mint 20
--- Command     : write_vhdl -force -mode synth_stub
---               /home/pierrick/LPSC_workspace/lpsc-mandelbrot/ips/hw/lpsc_clk_mandelbrot/src/ip_core/clk_mandelbrot/clk_mandelbrot_stub.vhdl
+-- Command     : write_vhdl -force -mode synth_stub -rename_top clk_mandelbrot -prefix
+--               clk_mandelbrot_ clk_mandelbrot_stub.vhdl
 -- Design      : clk_mandelbrot
 -- Purpose     : Stub declaration of top-level module interface
 -- Device      : xc7a200tsbg484-1

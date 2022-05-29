@@ -116,7 +116,8 @@ architecture arch of lpsc_mandelbrot_firmware is
     constant C_FIFO_PARITY_SIZE                 : integer               := 4;
     constant C_OUTPUT_BUFFER                    : boolean               := false;
 
-    constant NB_CALCULATORS			: integer		:= 3;
+    constant C_NB_CALCULATORS			: integer		:= 70;
+    constant C_NB_ITER				: integer		:= 127;
 
     -- Components
 
@@ -188,7 +189,7 @@ architecture arch of lpsc_mandelbrot_firmware is
     COMPONENT lpsc_mandelbrot_calculator_comp
     		generic(
 		comma : integer := 14;
-		max_iter : integer := 127;
+		max_iter : integer := C_NB_ITER;
 		SIZE : integer := 18;
 		SCREEN_RES : integer := 10
 		);
@@ -260,10 +261,10 @@ architecture arch of lpsc_mandelbrot_firmware is
     signal DataImGen2HDMIxD     : std_logic_vector(((C_PIXEL_SIZE * 3) - 1) downto 0);
     signal DataImGen2BramMVxD         : std_logic_vector(((C_PIXEL_SIZE * 3) - 1) downto 0);
 
-    type t_DataImGen2Bram is array((NB_CALCULATORS -1 ) downto 0) of std_logic_vector(((C_PIXEL_SIZE * 3) - 1) downto 0);
-    type t_ArrayIter is array((NB_CALCULATORS -1) downto 0) of std_logic_vector(17 downto 0);	
-    type t_ArrayScreenHdmiY is array((NB_CALCULATORS -1) downto 0) of std_logic_vector((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE -1) downto 0) ;
-    type t_ArrayScreenHdmiX is array((NB_CALCULATORS -1) downto 0) of std_logic_vector((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE -1) downto 0) ;
+    type t_DataImGen2Bram is array((C_NB_CALCULATORS -1 ) downto 0) of std_logic_vector(((C_PIXEL_SIZE * 3) - 1) downto 0);
+    type t_ArrayIter is array((C_NB_CALCULATORS -1) downto 0) of std_logic_vector((C_DATA_SIZE - 1)  downto 0);	
+    type t_ArrayScreenHdmiY is array((C_NB_CALCULATORS -1) downto 0) of std_logic_vector((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE -1) downto 0) ;
+    type t_ArrayScreenHdmiX is array((C_NB_CALCULATORS -1) downto 0) of std_logic_vector((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE -1) downto 0) ;
 
     signal DataImGen2BramMVArrayxD    : t_DataImGen2Bram;
 
@@ -286,17 +287,19 @@ architecture arch of lpsc_mandelbrot_firmware is
     signal RdDataFlagColor1xDP  : std_logic_vector((C_FIFO_DATA_SIZE - 1) downto 0) := x"003a8923";
     signal RdDataFlagColor1xDN  : std_logic_vector((C_FIFO_DATA_SIZE - 1) downto 0) := x"003a8923";
 
-    -- Tests signals Calculator
-    signal ReadyxS		: std_logic_vector((NB_CALCULATORS-1) downto 0)	    := (others => '0');
-    signal StartxS		: std_logic_vector((NB_CALCULATORS-1) downto 0)	    := (others => '0');
-    signal FinishedxS		: std_logic_vector((NB_CALCULATORS-1) downto 0)	    := (others => '0');
+    -- Signals Calculator
+    signal ReadyxS		: std_logic_vector((C_NB_CALCULATORS-1) downto 0)	    := (others => '0');
+    signal StartxS		: std_logic_vector((C_NB_CALCULATORS-1) downto 0)	    := (others => '0');
+    signal FinishedxS		: std_logic_vector((C_NB_CALCULATORS-1) downto 0)	    := (others => '0');
     signal CrealxD		: std_logic_vector((C_DATA_SIZE - 1) downto 0)	    := (others => '0');
     signal CimaginaryxD		: std_logic_vector((C_DATA_SIZE - 1) downto 0)	    := (others => '0');
     signal IterationsxD		: t_ArrayIter := (others => (others => '0'));
-   
+    signal BusyxS		: std_logic_vector((C_NB_CALCULATORS - 1) downto 0) := (others => '0'); 
+    signal OtherFinishedxS	: std_logic_vector((C_NB_CALCULATORS - 1) downto 0) := (others => '0');
+    
     -- Signaux machine d'état 
     type States is (idle,iter,write_mem,write_mem_2,next_val);
-    type StatesArray is array((NB_CALCULATORS -1) downto 0) of States;
+    type StatesArray is array((C_NB_CALCULATORS -1) downto 0) of States;
     signal StatexP,State1xP : StatesArray := (others => idle);
   
     -- Tests signaux generator
@@ -308,13 +311,9 @@ architecture arch of lpsc_mandelbrot_firmware is
     signal XscreenxD		: std_logic_vector((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE -1) downto 0) := (others => '0');
     signal YscreenxD		: std_logic_vector((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE -1) downto 0) := (others => '0');
     signal XscreenHDMIxD	: std_logic_vector((C_BRAM_VIDEO_MEMORY_HIGH_ADDR_SIZE -1) downto 0) := (others => '0');
-    signal YscreenHDMIxD	: std_logic_vector((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE -1) downto 0) := (others => '0');
-    
+    signal YscreenHDMIxD	: std_logic_vector((C_BRAM_VIDEO_MEMORY_LOW_ADDR_SIZE -1) downto 0) := (others => '0'); 
     signal XscreenHDMIcalcxD	: t_ArrayScreenHdmiX := (others => (others => '0'));
     signal YscreenHDMIcalcxD	: t_ArrayScreenHdmiY := (others => (others => '0'));
-    signal BusyxS		: std_logic_vector((NB_CALCULATORS - 1) downto 0) := (others => '0');
-
-    signal OtherFinishedxS	: std_logic_vector((NB_CALCULATORS - 1) downto 0) := (others => '0');
 
     -- Debug signals 
     signal CounterclkxS		: std_logic_vector(31 downto 0)			    := (others => '0');
@@ -506,7 +505,9 @@ begin
 		);
 
 
-	GEN_CALCS : for I in 0 to (NB_CALCULATORS - 1 ) generate
+	-- Generator for calculators blocks
+
+	GEN_CALCS : for I in 0 to (C_NB_CALCULATORS - 1 ) generate
 
 		FIRST_CALC : if I = 0 generate
 			LpscMandelbrotCalculator_0 : lpsc_mandelbrot_calculator_comp
@@ -531,7 +532,7 @@ begin
 		end generate FIRST_CALC;
 
 		OTHER_CALC : IF I > 0 generate
-			OtherFinishedxS(I) <= '0' when unsigned(FinishedxS(I-1 downto 0)) = 0 else
+			OtherFinishedxS(I) <= '0' when (or FinishedxS(I-1 downto 0) = '0') else -- unsigned(FinishedxS(I-1 downto 0)) = 0 else
 					   '1';
 			LpscMandelbrotCalculator_X : lpsc_mandelbrot_calculator_comp
 		  		PORT MAP (
@@ -558,7 +559,9 @@ begin
 
     end block FpgaUserCDxB;
 
-    GEN_SM_CALCS : for I in 0 to (NB_CALCULATORS-1) generate
+    -- Generator for State machine for each calculator
+
+    GEN_SM_CALCS : for I in 0 to (C_NB_CALCULATORS-1) generate
     	sm_calc_X : process(all) is
 	begin
 		if PllNotLockedxS = '1' then
@@ -568,7 +571,7 @@ begin
 			case StatexP(I) is 
 				when idle =>
 					if ReadyxS(I) = '1' then
-						if I = 0 or (unsigned(BusyxS(I-1 downto 0)) = (2**I-1)) then 
+						if I = 0 or (and BusyxS(I-1 downto 0) = '1') then -- (unsigned(BusyxS(I-1 downto 0)) = (2**I-1)) then 
 							StartxS(I) <= '1';
 							StatexP(I) <= next_val;
 						else
@@ -581,8 +584,8 @@ begin
 					StatexP(I) <= iter;
 				when iter => 
 					if FinishedxS(I) = '1' then
-						if I = 0 or (unsigned(FinishedxS(I-1 downto 0)) = 0) then
-		                			DataImGen2BramMVArrayxD(I) <=  x"000000" when unsigned(IterationsxD(I)) > 127 else
+						if I = 0 or (or FinishedxS(I-1 downto 0) = '0') then -- (unsigned(FinishedxS(I-1 downto 0)) = 0) then
+		                			DataImGen2BramMVArrayxD(I) <=  x"000000" when unsigned(IterationsxD(I)) > C_NB_ITER else
 								       x"00" & IterationsxD(I)(6 downto 0) & '1' & x"FF";
 						
 							StatexP(I) <= write_mem;
@@ -602,6 +605,7 @@ begin
 	end process sm_calc_X;
     end generate GEN_SM_CALCS;
 
+    -- State machine for value change and HDMI 
 
     state_machine_hdmi : process(all) is
     begin
@@ -614,7 +618,7 @@ begin
 		XscreenHDMIxD <= XscreenHDMIxD;
 		YscreenHDMIxD <= YscreenHDMIxD;
 		DataImGen2BramMVxD <= DataImGen2BramMVxD;
-		for i in 0 to (NB_CALCULATORS-1) loop
+		for i in 0 to (C_NB_CALCULATORS-1) loop
 			if StatexP(I) = next_val then
 				NextValuexS <= '1';
 			end if;
@@ -628,6 +632,8 @@ begin
 		end loop;
 	end if;
     end process state_machine_hdmi;
+
+    -- State machine for cycle counter
 
     state_machine_debug : process(all) is 
     begin

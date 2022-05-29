@@ -1,10 +1,10 @@
 // Copyright 1986-2021 Xilinx, Inc. All Rights Reserved.
 // --------------------------------------------------------------------------------
 // Tool Version: Vivado v.2021.2 (lin64) Build 3367213 Tue Oct 19 02:47:39 MDT 2021
-// Date        : Wed May 18 19:36:58 2022
+// Date        : Wed May 18 19:36:57 2022
 // Host        : pierrick-Aspire-A515-54G running 64-bit Linux Mint 20
-// Command     : write_verilog -force -mode funcsim
-//               /home/pierrick/LPSC_workspace/lpsc-mandelbrot/ips/hw/lpsc_clk_mandelbrot/src/ip_core/clk_mandelbrot/clk_mandelbrot_sim_netlist.v
+// Command     : write_verilog -force -mode funcsim -rename_top clk_mandelbrot -prefix
+//               clk_mandelbrot_ clk_mandelbrot_sim_netlist.v
 // Design      : clk_mandelbrot
 // Purpose     : This verilog netlist is a functional simulation representation of the design and should not be modified
 //               or synthesized. This netlist cannot be used for SDF annotated simulation.
@@ -28,14 +28,14 @@ module clk_mandelbrot
   wire PllLockedxSO;
   wire reset;
 
-  clk_mandelbrot_clk_wiz inst
+  clk_mandelbrot_clk_mandelbrot_clk_wiz inst
        (.ClkMandelxCO(ClkMandelxCO),
         .ClkSys100MhzxCI(ClkSys100MhzxCI),
         .PllLockedxSO(PllLockedxSO),
         .reset(reset));
 endmodule
 
-module clk_mandelbrot_clk_wiz
+module clk_mandelbrot_clk_mandelbrot_clk_wiz
    (ClkMandelxCO,
     reset,
     PllLockedxSO,
